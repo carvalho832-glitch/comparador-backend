@@ -15,32 +15,35 @@ app.get('/buscar', async (req, res) => {
   }
 
   try {
-    // Rota pública de busca da Shopee Brasil - livre de bloqueios rígidos de IP
+    // API pública de busca da Shopee Brasil
     const url = `https://shopee.com.br/api/v4/search/search_items?keyword=${encodeURIComponent(termo)}&limit=10&page_type=search&version=1`;
     
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://shopee.com.br/'
+        'Referer': 'https://shopee.com.br/',
+        'X-Requested-With': 'XMLHttpRequest'
       }
     });
 
-    const itens = response.data.data.sections[0].data.item || [];
+    // Caminho exato dos itens dentro do JSON da Shopee
+    const itens = response.data?.data?.sections?.[0]?.data?.item || [];
 
-    // Formata os dados reais da Shopee para o seu layout "sleek"
+    // Formata os dados para o seu layout compacto
     const produtosFormatados = itens.map(prod => {
-      // A Shopee envia o preço multiplicado por 100.000, aqui nós corrigimos para Real
-      const precoReal = prod.item_basic.price / 100000;
+      const base = prod.item_basic;
+      // Ajusta o preço da Shopee (que vem sem a vírgula do centavo)
+      const precoReal = base.price / 100000;
       
       return {
-        title: prod.item_basic.name,
+        title: base.name,
         price: precoReal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
         platform: "Shopee",
         platformClass: "source-shopee",
-        // Monta o link real da imagem do produto na Shopee
-        image: `https://down-br.img.sgi.blinkstore.io/file/${prod.item_basic.image}`,
-        // Monta o link de direcionamento para o comprador
-        link: `https://shopee.com.br/product/${prod.item_basic.shopid}/${prod.item_basic.itemid}`
+        // Puxa a foto direto do CDN global de imagens da Shopee
+        image: `https://cf.shopee.com.br/file/${base.image}`,
+        // Link direto que abre o produto na Shopee
+        link: `https://shopee.com.br/product/${base.shopid}/${base.itemid}`
       };
     });
 
