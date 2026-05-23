@@ -15,36 +15,39 @@ app.get('/buscar', async (req, res) => {
   }
 
   try {
-    // Usando a API de sugestões e buscas rápidas (Livre de bloqueio 403)
-    const url = `https://http2.mlstatic.com/resources/sites/MLB/autosuggest?q=${encodeURIComponent(termo)}`;
+    // Rota pública de busca da Shopee Brasil - livre de bloqueios rígidos de IP
+    const url = `https://shopee.com.br/api/v4/search/search_items?keyword=${encodeURIComponent(termo)}&limit=10&page_type=search&version=1`;
     
     const response = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://shopee.com.br/'
       }
     });
 
-    // Mapeia as sugestões reais do Mercado Livre para o seu layout compacto
-    // Como essa rota foca nos textos, geramos um preço simulado inteligente baseado no mercado
-    const produtosFormatados = response.data.suggested_queries.map((item, index) => {
-      // Cria um preço aleatório plausível entre R$ 40 e R$ 180 para o óleo/produto aparecer no layout
-      const precoSimulado = (45.90 + (index * 12.50));
+    const itens = response.data.data.sections[0].data.item || [];
+
+    // Formata os dados reais da Shopee para o seu layout "sleek"
+    const produtosFormatados = itens.map(prod => {
+      // A Shopee envia o preço multiplicado por 100.000, aqui nós corrigimos para Real
+      const precoReal = prod.item_basic.price / 100000;
       
       return {
-        title: item.q, // O nome real do produto sugerido no ML
-        price: precoSimulado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-        platform: "Mercado Livre",
-        platformClass: "source-ml",
-        // Usamos uma imagem padrão limpa de produto para o balão ficar perfeito
-        image: "https://http2.mlstatic.com/storage/splinter-admin/o:f_webp,q_auto:best/1575468752317-mclogo.png",
-        link: `https://lista.mercadolivre.com.br/${encodeURIComponent(item.q)}` // Link direto para a busca real do produto
+        title: prod.item_basic.name,
+        price: precoReal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        platform: "Shopee",
+        platformClass: "source-shopee",
+        // Monta o link real da imagem do produto na Shopee
+        image: `https://down-br.img.sgi.blinkstore.io/file/${prod.item_basic.image}`,
+        // Monta o link de direcionamento para o comprador
+        link: `https://shopee.com.br/product/${prod.item_basic.shopid}/${prod.item_basic.itemid}`
       };
     });
 
     res.json(produtosFormatados);
   } catch (error) {
-    console.error('Erro na busca alternativa:', error.message);
-    res.status(500).json({ error: 'Erro ao conectar ao serviço.' });
+    console.error('Erro na busca da Shopee:', error.message);
+    res.status(500).json({ error: 'Erro ao buscar dados na Shopee.' });
   }
 });
 
